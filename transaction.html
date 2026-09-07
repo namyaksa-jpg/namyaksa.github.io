@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>공용 거래명세서 관리 | 약사 거래처 네트워크</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --ink:#1e293b; --muted:#64748b; --line:#e2e8f0; --bg:#f8fafc;
+    --accent:#0f766e; --accent-dark:#0e6b63; --danger:#e11d48; --danger-bg:#fff1f2;
+    --warn-bg:#fffbeb; --warn-line:#fde68a; --warn-ink:#92400e;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Noto Sans KR', sans-serif; -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:900px; margin:0 auto; padding:28px 16px 60px; }
+  h1{ font-family:'Noto Serif KR', serif; font-size:1.6rem; margin:0 0 4px; }
+  .sub{ color:var(--muted); font-size:0.9rem; margin:0 0 20px; }
+
+  .tabs{ display:flex; gap:4px; flex-wrap:wrap; }
+  .tab{ border:1px solid transparent; border-bottom:none; background:#e2e8f0; color:var(--muted);
+    padding:10px 18px; font-size:0.9rem; font-weight:500; border-radius:8px 8px 0 0; cursor:pointer; }
+  .tab.active{ background:#fff; color:var(--accent); border-color:var(--line); }
+  .panel{ background:#fff; border:1px solid var(--line); border-radius:0 8px 8px 8px; padding:22px; }
+  .panel > p.desc{ color:var(--muted); font-size:0.88rem; margin-top:0; }
+
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:600px){ .grid2{ grid-template-columns:1fr; } }
+  .field label{ display:block; font-size:0.78rem; color:var(--muted); margin-bottom:4px; }
+  .field input, .field select{ width:100%; padding:9px 11px; font-size:0.9rem; border:1px solid #cbd5e1;
+    border-radius:6px; color:var(--ink); font-family:inherit; }
+  .field input:focus, .field select:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 2px rgba(15,118,110,0.15); }
+  .span2{ grid-column:1/-1; }
+
+  .btn{ display:inline-flex; align-items:center; gap:6px; border:none; border-radius:6px; padding:10px 18px;
+    font-size:0.88rem; font-weight:500; cursor:pointer; font-family:inherit; }
+  .btn-primary{ background:var(--accent); color:#fff; }
+  .btn-primary:hover{ background:var(--accent-dark); }
+  .btn-primary:disabled{ background:#94a3b8; cursor:not-allowed; }
+  .btn-ghost{ background:transparent; border:1px solid #cbd5e1; color:var(--muted); }
+  .btn-ghost:hover{ background:#f1f5f9; }
+  .btn-link{ background:none; border:none; color:var(--accent); cursor:pointer; font-size:0.88rem; padding:0; font-family:inherit; }
+  .btn-icon{ background:none; border:none; cursor:pointer; padding:5px; border-radius:5px; color:var(--muted); }
+  .btn-icon:hover{ background:#f1f5f9; }
+  .btn-icon.danger{ color:var(--danger); }
+  .btn-icon.danger:hover{ background:var(--danger-bg); }
+
+  .flash{ color:var(--accent); font-size:0.85rem; margin-left:10px; }
+  .error{ color:var(--danger); background:var(--danger-bg); padding:8px 12px; border-radius:6px; font-size:0.85rem; margin-top:10px; }
+  .badge{ display:inline-block; font-size:0.72rem; background:var(--accent); color:#fff; padding:2px 8px; border-radius:999px; margin-left:8px; vertical-align:middle; }
+
+  .box{ background:#f8fafc; border:1px solid var(--line); border-radius:8px; padding:16px; margin-bottom:20px; }
+  .box h3{ font-size:0.9rem; margin:0 0 12px; }
+
+  ul.partner-list{ list-style:none; margin:0; padding:0; border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  ul.partner-list li{ display:flex; justify-content:space-between; gap:10px; align-items:flex-start; padding:12px 14px; border-bottom:1px solid var(--line); }
+  ul.partner-list li:last-child{ border-bottom:none; }
+  .p-name{ font-weight:500; }
+  .p-meta{ display:flex; flex-wrap:wrap; gap:2px 14px; color:var(--muted); font-size:0.78rem; margin-top:3px; }
+  .empty-msg{ text-align:center; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:8px; padding:24px; font-size:0.88rem; }
+
+  table.items{ width:100%; border-collapse:collapse; font-size:0.88rem; }
+  table.items th{ background:#f1f5f9; color:var(--muted); font-size:0.75rem; text-align:left; padding:8px 6px; }
+  table.items td{ padding:6px; border-top:1px solid var(--line); }
+  table.items input{ width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:5px; font-size:0.85rem; font-family:inherit; }
+  table.items input:focus{ outline:none; border-color:var(--accent); }
+  .num{ text-align:right; }
+  .table-scroll{ overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
+  table.items tfoot td{ background:#f8fafc; font-weight:700; }
+
+  .partner-info{ background:#f8fafc; border:1px solid var(--line); border-radius:6px; padding:8px 12px; font-size:0.8rem; color:var(--muted); margin-top:10px; }
+  footer.note{ text-align:center; color:#94a3b8; font-size:0.75rem; margin-top:18px; }
+
+  .setup-box{ background:var(--warn-bg); border:1px solid var(--warn-line); color:var(--warn-ink); border-radius:10px; padding:20px 22px; }
+  .setup-box h2{ margin-top:0; font-size:1.15rem; }
+  .setup-box ol{ padding-left:20px; }
+  .setup-box li{ margin-bottom:10px; line-height:1.5; }
+  .setup-box code, .setup-box pre{ background:#fff; border:1px solid var(--warn-line); border-radius:6px; padding:2px 6px; font-size:0.82rem; }
+  .setup-box pre{ padding:12px; overflow-x:auto; white-space:pre; }
+  .copy-btn{ margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>공용 거래명세서 관리</h1>
+  <p class="sub">참여 약사님들이 함께 쓰는 거래처 디렉토리입니다. 누군가 한 번 등록하면 모두가 바로 선택해서 쓸 수 있어요.</p>
+  <div id="app"></div>
+  <footer class="note">이 페이지는 링크를 아는 누구나 열람·수정할 수 있는 공용 목록을 사용합니다.</footer>
+</div>
+
+<script>
+/* ====================================================================
+   1) 여기에 본인의 Firebase 프로젝트 설정 값을 붙여넣으세요.
+      Firebase 콘솔(console.firebase.google.com) > 프로젝트 설정 > 내 앱
+      에서 "구성" 또는 "config" 형태로 제공되는 값입니다.
+   ==================================================================== */
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+const FIRESTORE_RULES = `rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}`;
+
+const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("YOUR_") !== 0;
+
+function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function won(n){ return (Number(n)||0).toLocaleString("ko-KR"); }
+function newItem(){ return { id: Date.now()+Math.random(), name:"", spec:"", qty:1, price:0, note:"" }; }
+function emptyForm(){ return { name:"", biz:"", ceo:"", phone:"", address:"" }; }
+
+if(!isConfigured){
+  document.getElementById("app").innerHTML = `
+    <div class="setup-box">
+      <h2>Firebase 연결이 아직 설정되지 않았어요</h2>
+      <p>여러 약사님이 함께 쓰는 목록을 저장하려면, 무료 Firebase 프로젝트를 한 번만 만들어 연결해야 합니다. (5분 정도 소요)</p>
+      <ol>
+        <li><a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a> 접속 → 구글 계정으로 로그인 → <strong>"프로젝트 추가"</strong> 클릭 → 이름 입력 후 생성 (Google Analytics는 꺼도 됩니다)</li>
+        <li>왼쪽 메뉴 <strong>빌드 → Firestore Database</strong> → <strong>데이터베이스 만들기</strong> → 위치는 <code>asia-northeast3 (서울)</code> 선택 → 테스트 모드로 시작</li>
+        <li>Firestore의 <strong>규칙(Rules)</strong> 탭을 열고 아래 내용을 그대로 붙여넣은 뒤 <strong>게시(Publish)</strong>:
+          <pre id="rules-text">${FIRESTORE_RULES}</pre>
+          <button class="btn btn-ghost copy-btn" id="copy-rules">규칙 복사하기</button>
+        </li>
+        <li>프로젝트 설정(톱니바퀴 아이콘) → 아래로 스크롤 → <strong>내 앱</strong> → <code>&lt;/&gt;</code>(웹) 아이콘 클릭 → 앱 닉네임 입력 후 등록 (Firebase Hosting은 체크 안 해도 됩니다)</li>
+        <li>화면에 나오는 <code>firebaseConfig</code> 객체 값을 이 파일 상단의 <code>firebaseConfig</code> 부분에 그대로 붙여넣고 저장 → 다시 페이지를 열면 완료!</li>
+      </ol>
+      <p>이 파일은 <code>transaction.html</code>로 GitHub 저장소에 이미 올려두신 것을 그대로 덮어쓰기(또는 새 파일로 교체)하시면 됩니다.</p>
+    </div>
+  `;
+  document.getElementById("copy-rules").addEventListener("click", ()=>{
+    navigator.clipboard.writeText(FIRESTORE_RULES).then(()=>{
+      const btn = document.getElementById("copy-rules");
+      btn.textContent = "복사됨!";
+      setTimeout(()=>{ btn.textContent = "규칙 복사하기"; }, 1500);
+    });
+  });
+} else {
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  /* ----------------------------------------------------------------
+     보험약가 자동입력: 같은 폴더에 drug_prices.json 파일이 있으면
+     불러와서 품목명 입력 시 상한금액을 자동으로 채워줍니다.
+     drug_prices.json은 drug_price_converter.html 도구로 만들 수 있습니다.
+     형식 예시: [{"name":"타이레놀정500mg","price":50}, ...]
+  ---------------------------------------------------------------- */
+  let drugPriceMap = {};   // 정규화된 이름 -> 가격
+  let drugPriceCount = 0;
+  let drugDataStatus = "checking"; // checking | ok | missing
+
+  function normalizeDrugName(s){ return (s||"").trim().replace(/\s+/g," "); }
+
+  function buildDrugDatalist(){
+    let dl = document.getElementById("drug-datalist");
+    if(!dl){
+      dl = document.createElement("datalist");
+      dl.id = "drug-datalist";
+      document.body.appendChild(dl);
+    }
+    const names = Object.keys(drugPriceMap);
+    dl.innerHTML = names.map(n => `<option value="${esc(n)}">`).join("");
+  }
+
+  fetch("./drug_prices.json")
+    .then(res => { if(!res.ok) throw new Error("not found"); return res.json(); })
+    .then(list => {
+      if(!Array.isArray(list)) throw new Error("invalid format");
+      list.forEach(row => {
+        const name = normalizeDrugName(row.name);
+        const price = Number(row.price);
+        if(name && !isNaN(price)) drugPriceMap[name] = price;
+      });
+      drugPriceCount = Object.keys(drugPriceMap).length;
+      drugDataStatus = drugPriceCount > 0 ? "ok" : "missing";
+      buildDrugDatalist();
+      if(state.activeTab === "transaction") render();
+    })
+    .catch(() => {
+      drugDataStatus = "missing";
+      if(state.activeTab === "transaction") render();
+    });
+
+  let state = {
+    activeTab: "directory",
+    pharmacies: [],
+    loading: true,
+    connError: "",
+    myPharmacyId: localStorage.getItem("myPharmacyId") || "",
+    editingId: null,
+    form: emptyForm(),
+    formError: "",
+    txDate: new Date().toISOString().slice(0,10),
+    selectedPartnerId: "",
+    items: [newItem()],
+    txNote: "",
+    txError: ""
+  };
+
+  db.collection("pharmacies").onSnapshot(
+    snap => {
+      state.pharmacies = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      state.loading = false;
+      state.connError = "";
+      render();
+    },
+    err => {
+      state.loading = false;
+      state.connError = "공용 목록을 불러오지 못했습니다. Firestore 보안 규칙이 올바르게 게시되었는지 확인해 주세요. (" + err.message + ")";
+      render();
+    }
+  );
+
+  function render(){
+    const app = document.getElementById("app");
+    app.innerHTML = `
+      <div class="tabs">
+        <button class="tab ${state.activeTab==='directory'?'active':''}" data-tab="directory">약국 디렉토리 (공용)</button>
+        <button class="tab ${state.activeTab==='mine'?'active':''}" data-tab="mine">내 약국 설정</button>
+        <button class="tab ${state.activeTab==='transaction'?'active':''}" data-tab="transaction">거래명세서 작성</button>
+      </div>
+      <div class="panel">
+        ${state.connError ? `<div class="error">${esc(state.connError)}</div>` : ""}
+        ${state.loading ? `<p style="color:#94a3b8; font-size:0.88rem;">불러오는 중...</p>` : renderTab()}
+      </div>
+    `;
+    document.querySelectorAll(".tab").forEach(btn=>{
+      btn.addEventListener("click", ()=>{ state.activeTab = btn.dataset.tab; render(); });
+    });
+    if(!state.loading) attachTabListeners();
+  }
+
+  function renderTab(){
+    if(state.activeTab === "directory") return renderDirectory();
+    if(state.activeTab === "mine") return renderMine();
+    return renderTransaction();
+  }
+
+  function renderDirectory(){
+    const f = state.form;
+    const list = state.pharmacies.length === 0
+      ? `<p class="empty-msg">아직 등록된 약국이 없습니다. 아래 양식으로 가장 먼저 등록해 보세요.</p>`
+      : `<ul class="partner-list">${state.pharmacies.map(p => `
+          <li>
+            <div>
+              <div class="p-name">${esc(p.name)}${p.id === state.myPharmacyId ? '<span class="badge">내 약국</span>' : ""}</div>
+              <div class="p-meta">
+                ${p.ceo?`<span>대표자 ${esc(p.ceo)}</span>`:""}
+                ${p.phone?`<span>전화 ${esc(p.phone)}</span>`:""}
+                ${p.address?`<span>${esc(p.address)}</span>`:""}
+                ${p.biz?`<span>사업자 ${esc(p.biz)}</span>`:""}
+              </div>
+            </div>
+            <div style="display:flex; gap:2px; flex-shrink:0;">
+              <button class="btn-icon" data-edit="${p.id}" title="수정">✎</button>
+              <button class="btn-icon danger" data-delete="${p.id}" title="삭제">✕</button>
+            </div>
+          </li>`).join("")}</ul>`;
+
+    return `
+      <p class="desc">여기 등록된 약국은 참여하는 모든 약사님 화면에 실시간으로 공유됩니다. 우리 약국도 여기에 한 번 등록해 두세요.</p>
+      <div class="box">
+        <h3>${state.editingId ? "약국 정보 수정" : "새 약국 등록"}</h3>
+        <div class="grid2">
+          <div class="field"><label>약국명 (상호) *</label><input id="f-name" value="${esc(f.name)}" placeholder="예: 행복약국"></div>
+          <div class="field"><label>사업자등록번호</label><input id="f-biz" value="${esc(f.biz)}" placeholder="000-00-00000"></div>
+          <div class="field"><label>대표자</label><input id="f-ceo" value="${esc(f.ceo)}" placeholder="대표 약사님 성함"></div>
+          <div class="field"><label>전화번호</label><input id="f-phone" value="${esc(f.phone)}" placeholder="02-000-0000"></div>
+          <div class="field span2"><label>주소</label><input id="f-address" value="${esc(f.address)}" placeholder="약국 주소"></div>
+        </div>
+        ${state.formError ? `<div class="error">${esc(state.formError)}</div>` : ""}
+        <div style="margin-top:12px; display:flex; gap:8px;">
+          <button class="btn btn-primary" id="submit-form">${state.editingId ? "수정 완료" : "약국 등록"}</button>
+          ${state.editingId ? `<button class="btn btn-ghost" id="cancel-edit">취소</button>` : ""}
+        </div>
+      </div>
+      <h3 style="font-size:0.9rem; margin-bottom:8px;">등록된 약국 (${state.pharmacies.length})</h3>
+      ${list}
+    `;
+  }
+
+  function renderMine(){
+    const mine = state.pharmacies.find(p => p.id === state.myPharmacyId);
+    return `
+      <p class="desc">디렉토리에 등록된 약국 중, 어떤 것이 우리 약국인지 선택해 두면 거래명세서의 '공급자' 정보로 자동 사용됩니다. 이 선택은 이 브라우저에만 저장됩니다.</p>
+      ${state.pharmacies.length === 0
+        ? `<p class="empty-msg">먼저 '약국 디렉토리' 탭에서 우리 약국을 등록해 주세요.</p>`
+        : `<div class="field" style="max-width:360px;">
+             <label>내 약국 선택</label>
+             <select id="mine-select">
+               <option value="">선택하세요</option>
+               ${state.pharmacies.map(p => `<option value="${p.id}" ${p.id===state.myPharmacyId?"selected":""}>${esc(p.name)}</option>`).join("")}
+             </select>
+           </div>`}
+      ${mine ? `<div class="partner-info" style="margin-top:14px;">
+          현재 선택됨: <strong>${esc(mine.name)}</strong>
+          ${mine.phone?` · ${esc(mine.phone)}`:""}
+        </div>` : ""}
+    `;
+  }
+
+  function renderTransaction(){
+    const mine = state.pharmacies.find(p => p.id === state.myPharmacyId);
+    const partnerOptions = state.pharmacies.filter(p => p.id !== state.myPharmacyId);
+    const partner = partnerOptions.find(p => p.id === state.selectedPartnerId);
+    const total = state.items.reduce((s,it)=> s + (Number(it.qty)||0)*(Number(it.price)||0), 0);
+
+    if(!mine){
+      return `<p class="empty-msg">먼저 '내 약국 설정' 탭에서 우리 약국을 선택해 주세요.</p>`;
+    }
+
+    const itemRows = state.items.map((it,idx)=>`
+      <tr data-item="${it.id}">
+        <td>${idx+1}</td>
+        <td><input data-field="name" list="drug-datalist" autocomplete="off" value="${esc(it.name)}" placeholder="약품/물품명"></td>
+        <td><input data-field="spec" value="${esc(it.spec)}"></td>
+        <td><input data-field="qty" type="number" min="0" value="${it.qty}" style="text-align:right;"></td>
+        <td><input data-field="price" type="number" min="0" value="${it.price}" style="text-align:right;"></td>
+        <td class="num">${won((Number(it.qty)||0)*(Number(it.price)||0))}</td>
+        <td style="text-align:center;"><button class="btn-icon danger" data-remove-item="${it.id}">✕</button></td>
+      </tr>
+    `).join("");
+
+    return `
+      <div class="partner-info" style="margin-bottom:16px;">공급자(나): <strong>${esc(mine.name)}</strong>${mine.phone?` · ${esc(mine.phone)}`:""}</div>
+      <div class="grid2">
+        <div class="field"><label>거래일자</label><input type="date" id="tx-date" value="${state.txDate}"></div>
+        <div class="field">
+          <label>상대 약국 (공급받는자)</label>
+          ${partnerOptions.length === 0
+            ? `<p style="font-size:0.8rem; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:6px; padding:8px 10px; margin:0;">디렉토리에 다른 약국이 아직 없습니다.</p>`
+            : `<select id="tx-partner">
+                 <option value="">선택하세요</option>
+                 ${partnerOptions.map(p=>`<option value="${p.id}" ${p.id===state.selectedPartnerId?"selected":""}>${esc(p.name)}</option>`).join("")}
+               </select>`}
+        </div>
+      </div>
+      ${partner ? `<div class="partner-info">
+          ${partner.ceo?`대표자: ${esc(partner.ceo)} &nbsp; `:""}
+          ${partner.phone?`전화: ${esc(partner.phone)} &nbsp; `:""}
+          ${partner.address?`주소: ${esc(partner.address)}`:""}
+        </div>` : ""}
+
+      <h3 style="font-size:0.9rem; margin:22px 0 8px;">거래 품목</h3>
+      <p style="font-size:0.78rem; color:${drugDataStatus==='ok' ? '#0f766e' : '#94a3b8'}; margin:0 0 8px;">
+        ${drugDataStatus==='ok'
+          ? `등록된 약가 데이터 ${drugPriceCount.toLocaleString('ko-KR')}개 품목과 일치하는 제품명을 입력하면 단가가 자동으로 채워집니다. (등재 시점의 상한금액 기준이며, 실제 고시와 다를 수 있으니 확인해 주세요)`
+          : `약가 자동입력이 아직 연결되지 않았습니다. drug_price_converter.html 도구로 drug_prices.json을 만들어 이 파일과 같은 폴더에 올려두면 자동으로 활성화됩니다.`}
+      </p>
+      <div class="table-scroll">
+        <table class="items">
+          <thead><tr>
+            <th style="width:28px;">#</th><th>품목명</th><th style="width:90px;">규격</th>
+            <th style="width:70px;">수량</th><th style="width:100px;">단가</th>
+            <th style="width:100px;">금액</th><th style="width:28px;"></th>
+          </tr></thead>
+          <tbody>${itemRows}</tbody>
+          <tfoot><tr>
+            <td colspan="5" style="text-align:right;">합계</td>
+            <td class="num" style="color:var(--accent);">${won(total)} 원</td>
+            <td></td>
+          </tr></tfoot>
+        </table>
+      </div>
+      <button class="btn-link" id="add-item" style="margin-top:8px;">+ 품목 추가</button>
+
+      <div class="field" style="margin-top:16px;">
+        <label>비고 (선택)</label>
+        <input id="tx-note" value="${esc(state.txNote)}" placeholder="특이사항이 있으면 입력하세요">
+      </div>
+
+      ${state.txError ? `<div class="error">${esc(state.txError)}</div>` : ""}
+
+      <div style="margin-top:18px;">
+        <button class="btn btn-primary" id="export-excel">⬇ 엑셀 거래명세서 다운로드</button>
+        <span class="flash" id="export-flash" style="display:none;">다운로드되었습니다.</span>
+      </div>
+    `;
+  }
+
+  function attachTabListeners(){
+    if(state.activeTab === "directory"){
+      document.getElementById("submit-form").addEventListener("click", async ()=>{
+        const f = {
+          name: document.getElementById("f-name").value.trim(),
+          biz: document.getElementById("f-biz").value.trim(),
+          ceo: document.getElementById("f-ceo").value.trim(),
+          phone: document.getElementById("f-phone").value.trim(),
+          address: document.getElementById("f-address").value.trim()
+        };
+        if(!f.name){ state.formError = "약국명(상호)은 필수입니다."; render(); return; }
+        try{
+          if(state.editingId){
+            await db.collection("pharmacies").doc(state.editingId).set(f, { merge:true });
+          } else {
+            await db.collection("pharmacies").add(f);
+          }
+          state.editingId = null;
+          state.form = emptyForm();
+          state.formError = "";
+          render();
+        }catch(e){
+          state.formError = "저장에 실패했습니다. Firebase 설정 및 Firestore 규칙을 확인해 주세요. (" + e.message + ")";
+          render();
+        }
+      });
+      const cancelBtn = document.getElementById("cancel-edit");
+      if(cancelBtn) cancelBtn.addEventListener("click", ()=>{
+        state.editingId = null; state.form = emptyForm(); state.formError = ""; render();
+      });
+      document.querySelectorAll("[data-edit]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const id = btn.dataset.edit;
+          const p = state.pharmacies.find(x=>x.id===id);
+          state.editingId = id;
+          state.form = { name:p.name||"", biz:p.biz||"", ceo:p.ceo||"", phone:p.phone||"", address:p.address||"" };
+          render();
+        });
+      });
+      document.querySelectorAll("[data-delete]").forEach(btn=>{
+        btn.addEventListener("click", async ()=>{
+          const id = btn.dataset.delete;
+          if(!confirm("이 약국 정보를 목록에서 삭제할까요? 다른 약사님에게도 함께 사라집니다.")) return;
+          try{
+            await db.collection("pharmacies").doc(id).delete();
+            if(state.myPharmacyId === id){ state.myPharmacyId = ""; localStorage.removeItem("myPharmacyId"); }
+          }catch(e){
+            alert("삭제에 실패했습니다: " + e.message);
+          }
+        });
+      });
+      ["f-name","f-biz","f-ceo","f-phone","f-address"].forEach(id=>{
+        const el = document.getElementById(id);
+        const key = id.replace("f-","");
+        el.addEventListener("input", ()=>{ state.form[key] = el.value; });
+      });
+    }
+
+    if(state.activeTab === "mine"){
+      const sel = document.getElementById("mine-select");
+      if(sel) sel.addEventListener("change", e=>{
+        state.myPharmacyId = e.target.value;
+        localStorage.setItem("myPharmacyId", state.myPharmacyId);
+        render();
+      });
+    }
+
+    if(state.activeTab === "transaction"){
+      const dateEl = document.getElementById("tx-date");
+      if(dateEl) dateEl.addEventListener("change", e=>{ state.txDate = e.target.value; });
+      const sel = document.getElementById("tx-partner");
+      if(sel) sel.addEventListener("change", e=>{ state.selectedPartnerId = e.target.value; render(); });
+      const noteEl = document.getElementById("tx-note");
+      if(noteEl) noteEl.addEventListener("input", e=>{ state.txNote = e.target.value; });
+      const addBtn = document.getElementById("add-item");
+      if(addBtn) addBtn.addEventListener("click", ()=>{ state.items.push(newItem()); render(); });
+      document.querySelectorAll("[data-remove-item]").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          if(state.items.length === 1) return;
+          state.items = state.items.filter(it => String(it.id) !== btn.dataset.removeItem);
+          render();
+        });
+      });
+      document.querySelectorAll("tr[data-item] input").forEach(input=>{
+        input.addEventListener("input", ()=>{
+          const row = input.closest("tr");
+          const id = row.dataset.item;
+          const field = input.dataset.field;
+          const it = state.items.find(x => String(x.id) === String(id));
+          it[field] = input.value;
+
+          // 품목명이 약가 데이터와 정확히 일치하면 단가 자동 채우기
+          if(field === "name"){
+            const matchedPrice = drugPriceMap[normalizeDrugName(input.value)];
+            if(matchedPrice !== undefined){
+              it.price = matchedPrice;
+              const priceInput = row.querySelector('input[data-field="price"]');
+              if(priceInput) priceInput.value = matchedPrice;
+            }
+          }
+
+          const amountCell = row.children[5];
+          amountCell.textContent = won((Number(it.qty)||0)*(Number(it.price)||0));
+          const total = state.items.reduce((s,x)=> s + (Number(x.qty)||0)*(Number(x.price)||0), 0);
+          const totalCell = document.querySelector("table.items tfoot .num");
+          if(totalCell) totalCell.textContent = won(total) + " 원";
+        });
+      });
+      const exportBtn = document.getElementById("export-excel");
+      if(exportBtn) exportBtn.addEventListener("click", exportExcel);
+    }
+  }
+
+  function exportExcel(){
+    state.txError = "";
+    const mine = state.pharmacies.find(p => p.id === state.myPharmacyId);
+    const partner = state.pharmacies.find(p => p.id === state.selectedPartnerId);
+    if(!mine){ state.txError = "먼저 '내 약국 설정'에서 우리 약국을 선택해 주세요."; render(); return; }
+    if(!partner){ state.txError = "거래할 상대 약국을 선택해 주세요."; render(); return; }
+    const validItems = state.items.filter(it => it.name && it.name.trim());
+    if(validItems.length === 0){ state.txError = "품목을 최소 1개 이상 입력해 주세요."; render(); return; }
+
+    const aoa = [
+      ["거래명세서","","","","","",""],
+      [],
+      ["거래일자", state.txDate, "", "", "", "", ""],
+      ["공급자","상호", mine.name, "사업자등록번호", mine.biz||"", "", ""],
+      ["","대표자", mine.ceo||"", "전화번호", mine.phone||"", "", ""],
+      ["","주소", mine.address||"", "", "", "", ""],
+      [],
+      ["공급받는자","상호", partner.name, "사업자등록번호", partner.biz||"", "", ""],
+      ["","대표자", partner.ceo||"", "전화번호", partner.phone||"", "", ""],
+      ["","주소", partner.address||"", "", "", "", ""],
+      [],
+      ["번호","품목명","규격","수량","단가","공급가액","비고"],
+      ...validItems.map((it,idx)=>[
+        idx+1, it.name, it.spec, Number(it.qty)||0, Number(it.price)||0,
+        (Number(it.qty)||0)*(Number(it.price)||0), it.note||""
+      ]),
+      ["합계","","","","", validItems.reduce((s,it)=> s + (Number(it.qty)||0)*(Number(it.price)||0), 0), ""]
+    ];
+    if(state.txNote && state.txNote.trim()){
+      aoa.push([]);
+      aoa.push(["비고", state.txNote, "", "", "", "", ""]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const lastRow = 11 + validItems.length;
+    ws["!merges"] = [
+      { s:{r:0,c:0}, e:{r:0,c:6} },
+      { s:{r:2,c:1}, e:{r:2,c:6} },
+      { s:{r:3,c:0}, e:{r:5,c:0} },
+      { s:{r:5,c:2}, e:{r:5,c:6} },
+      { s:{r:7,c:0}, e:{r:9,c:0} },
+      { s:{r:9,c:2}, e:{r:9,c:6} },
+      { s:{r:lastRow,c:0}, e:{r:lastRow,c:4} }
+    ];
+    ws["!cols"] = [{wch:10},{wch:20},{wch:12},{wch:8},{wch:10},{wch:14},{wch:16}];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "거래명세서");
+    const wbout = XLSX.write(wb, { bookType:"xlsx", type:"array" });
+    const blob = new Blob([wbout], { type:"application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `거래명세서_${partner.name}_${state.txDate}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    render();
+    const flash = document.getElementById("export-flash");
+    if(flash){ flash.style.display = "inline"; setTimeout(()=>{ flash.style.display="none"; }, 1800); }
+  }
+
+  render();
+}
+</script>
+</body>
+</html>

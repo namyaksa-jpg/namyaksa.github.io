@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>약가 데이터 변환기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{ --ink:#1e293b; --muted:#64748b; --line:#e2e8f0; --bg:#f8fafc; --accent:#0f766e; --accent-dark:#0e6b63; }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Noto Sans KR', sans-serif; }
+  .wrap{ max-width:760px; margin:0 auto; padding:28px 16px 60px; }
+  h1{ font-family:'Noto Serif KR', serif; font-size:1.5rem; margin:0 0 6px; }
+  .sub{ color:var(--muted); font-size:0.9rem; margin:0 0 20px; }
+  .box{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:22px; margin-bottom:18px; }
+  .box h2{ font-size:1rem; margin:0 0 10px; }
+  .box p{ font-size:0.85rem; color:var(--muted); line-height:1.6; }
+  a{ color:var(--accent); }
+  input[type=file]{ font-size:0.88rem; }
+  select{ padding:7px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.88rem; font-family:inherit; }
+  label{ font-size:0.8rem; color:var(--muted); display:block; margin-bottom:4px; }
+  .row{ display:flex; gap:16px; flex-wrap:wrap; margin:14px 0; }
+  .field{ min-width:220px; }
+  .btn{ display:inline-block; border:none; border-radius:6px; padding:10px 18px; font-size:0.88rem; font-weight:500; cursor:pointer; font-family:inherit; background:var(--accent); color:#fff; }
+  .btn:hover{ background:var(--accent-dark); }
+  .btn:disabled{ background:#94a3b8; cursor:not-allowed; }
+  table{ width:100%; border-collapse:collapse; font-size:0.8rem; margin-top:12px; }
+  th,td{ border:1px solid var(--line); padding:6px 8px; text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
+  th{ background:#f1f5f9; }
+  .status{ font-size:0.85rem; margin-top:12px; }
+  .status.ok{ color:var(--accent); }
+  .status.err{ color:#e11d48; }
+  .step{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; background:var(--accent); color:#fff; font-size:0.78rem; margin-right:8px; flex-shrink:0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>약가 데이터 변환기</h1>
+  <p class="sub">건강보험심사평가원의 약가 파일을, 거래명세서 도구가 읽을 수 있는 <code>drug_prices.json</code> 형식으로 바꿔줍니다.</p>
+
+  <div class="box">
+    <h2><span class="step">1</span>원본 약가 파일 받기</h2>
+    <p>
+      공공데이터포털의
+      <a href="https://www.data.go.kr/data/15067459/fileData.do" target="_blank" rel="noopener">"약제급여목록 및 급여상한금액표"</a>
+      페이지에서 최신 파일(엑셀 또는 CSV)을 다운로드하세요. 건강보험심사평가원 홈페이지 &gt; 의료정보 &gt; 의약품정보 &gt; 자료공개에서도 같은 자료를 받을 수 있습니다.
+      이 자료는 보통 매달 갱신되니, 가끔 새로 받아 다시 변환해 주시면 최신 단가를 유지할 수 있어요.
+    </p>
+  </div>
+
+  <div class="box">
+    <h2><span class="step">2</span>파일 업로드</h2>
+    <input type="file" id="file-input" accept=".xlsx,.xls,.csv">
+    <div id="load-status" class="status"></div>
+  </div>
+
+  <div class="box" id="mapping-box" style="display:none;">
+    <h2><span class="step">3</span>어떤 열이 품목명/상한금액인지 선택</h2>
+    <p>업로드한 파일의 열 제목(헤더)입니다. "제품명"(또는 "약품명")과 "상한금액"(단가) 열을 각각 선택해 주세요.</p>
+    <div class="row">
+      <div class="field">
+        <label>품목명 열</label>
+        <select id="col-name"></select>
+      </div>
+      <div class="field">
+        <label>상한금액(단가) 열</label>
+        <select id="col-price"></select>
+      </div>
+    </div>
+    <div id="preview"></div>
+    <div style="margin-top:16px;">
+      <button class="btn" id="generate-btn">JSON 생성 및 다운로드</button>
+      <span id="gen-status" class="status"></span>
+    </div>
+  </div>
+
+  <div class="box">
+    <h2><span class="step">4</span>완성된 파일 올리기</h2>
+    <p>
+      다운로드된 <code>drug_prices.json</code> 파일을, 거래명세서 파일(<code>transaction.html</code>)과
+      <strong>같은 폴더(저장소 루트)</strong>에 GitHub 업로드하면 끝입니다. 다음에 열 때부터 품목명 입력 시
+      단가가 자동으로 채워집니다.
+    </p>
+  </div>
+</div>
+
+<script>
+let rawRows = [];
+let headers = [];
+
+document.getElementById("file-input").addEventListener("change", (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById("load-status");
+  statusEl.textContent = "읽는 중...";
+  statusEl.className = "status";
+
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    try{
+      const data = new Uint8Array(ev.target.result);
+      const wb = XLSX.read(data, { type: "array" });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      if(json.length === 0) throw new Error("데이터가 없습니다.");
+      rawRows = json;
+      headers = Object.keys(json[0]);
+      statusEl.textContent = `${rawRows.length.toLocaleString("ko-KR")}행을 불러왔습니다.`;
+      statusEl.className = "status ok";
+      setupMapping();
+    }catch(err){
+      statusEl.textContent = "파일을 읽지 못했습니다: " + err.message;
+      statusEl.className = "status err";
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function guessColumn(candidates){
+  for(const c of candidates){
+    const found = headers.find(h => h.replace(/\s/g,"").includes(c));
+    if(found) return found;
+  }
+  return headers[0];
+}
+
+function setupMapping(){
+  document.getElementById("mapping-box").style.display = "block";
+  const nameSel = document.getElementById("col-name");
+  const priceSel = document.getElementById("col-price");
+  nameSel.innerHTML = headers.map(h => `<option value="${h}">${h}</option>`).join("");
+  priceSel.innerHTML = headers.map(h => `<option value="${h}">${h}</option>`).join("");
+  nameSel.value = guessColumn(["제품명","품목명","약품명","상품명"]);
+  priceSel.value = guessColumn(["상한금액","약가","단가","금액"]);
+  renderPreview();
+  nameSel.addEventListener("change", renderPreview);
+  priceSel.addEventListener("change", renderPreview);
+}
+
+function renderPreview(){
+  const nameCol = document.getElementById("col-name").value;
+  const priceCol = document.getElementById("col-price").value;
+  const sample = rawRows.slice(0, 5);
+  document.getElementById("preview").innerHTML = `
+    <table>
+      <thead><tr><th>${nameCol} (품목명)</th><th>${priceCol} (단가)</th></tr></thead>
+      <tbody>
+        ${sample.map(r => `<tr><td>${r[nameCol]}</td><td>${r[priceCol]}</td></tr>`).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+document.getElementById("generate-btn").addEventListener("click", ()=>{
+  const nameCol = document.getElementById("col-name").value;
+  const priceCol = document.getElementById("col-price").value;
+  const genStatus = document.getElementById("gen-status");
+
+  const map = new Map();
+  rawRows.forEach(r=>{
+    const name = String(r[nameCol] ?? "").trim();
+    const priceRaw = String(r[priceCol] ?? "").replace(/[^0-9.]/g, "");
+    const price = Number(priceRaw);
+    if(name && !isNaN(price) && price > 0){
+      map.set(name, price); // 같은 이름이 여러 번 나오면 마지막 값 사용
+    }
+  });
+
+  if(map.size === 0){
+    genStatus.textContent = "유효한 데이터가 없습니다. 열 선택을 확인해 주세요.";
+    genStatus.className = "status err";
+    return;
+  }
+
+  const output = Array.from(map, ([name, price]) => ({ name, price }));
+  const blob = new Blob([JSON.stringify(output)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "drug_prices.json";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  genStatus.textContent = `${output.length.toLocaleString("ko-KR")}개 품목으로 drug_prices.json을 생성했습니다.`;
+  genStatus.className = "status ok";
+});
+</script>
+</body>
+</html>
