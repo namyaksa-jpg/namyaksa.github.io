@@ -677,10 +677,17 @@ if(!isConfigured){
       ["","대표자", partner.ceo||"", "전화번호", partner.phone||"", "", ""],
       ["","주소", partner.address||"", "", "", "", ""],
       [],
-      ["번호","품목명","규격","수량","단가","공급가액","비고"],
-     ...validItems.map((it, idx) => [idx + 1, it.name, it.spec, Number(it.qty)||0, Number(it.price)||0, (Number(it.qty)||0)*(Number(it.price)||0), it.note||""]),
-      ["합계","","","","", validItems.reduce((s,it)=> s + (Number(it.qty)||0)*(Number(it.price)||0), 0), ""]
-    ];
+     ["번호", "품목명", "규격", "수량", "단가", "공급가액", "비고"],
+...validItems.map((it, idx) => [
+  idx + 1,
+  it.name || "",
+  it.spec || "",
+  Number(it.qty) || 0,
+  Number(it.price) || 0,
+  (Number(it.qty) || 0) * (Number(it.price) || 0),
+  it.note || ""
+]),
+["합계", "", "", "", "", validItems.reduce((s, it) => s + (Number(it.qty) || 0) * (Number(it.price) || 0), 0), ""]
     if(state.txNote && state.txNote.trim()){ aoa.push([]); aoa.push(["비고", state.txNote, "", "", "", "", ""]); }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
