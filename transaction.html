@@ -408,27 +408,27 @@ if(!isConfigured){
   }
 
   function renderTransaction(){
-    const mine = state.pharmacies.find(p => p.id === state.myPharmacyId);
-    const partnerOptions = state.pharmacies.filter(p => p.id !== state.myPharmacyId);
-    const partner = partnerOptions.find(p => p.id === state.selectedPartnerId);
-    const total = state.items.reduce((s,it)=> s + (Number(it.qty)||0)*(Number(it.price)||0), 0);
-    if(!mine) return `<p class="empty-msg">먼저 '내 약국 설정' 탭에서 우리 약국을 선택해 주세요.</p>`;
+  const mine = state.pharmacies.find(p => p.id === state.myPharmacyId);
+  const partnerOptions = state.pharmacies.filter(p => p.id !== state.myPharmacyId);
+  const partner = partnerOptions.find(p => p.id === state.selectedPartnerId);
+  const total = state.items.reduce((s,it)=> s + (Number(it.qty)||0)*(Number(it.price)||0), 0);
+  if(!mine) return `<p class="empty-msg">먼저 '내 약국 설정' 탭에서 우리 약국을 선택해 주세요.</p>`;
 
-    const itemRows = state.items.map((it,idx)=>`
-      <tr data-item="${it.id}">
-        <td>${idx+1}</td>
-        <td><input data-field="name" list="drug-datalist" autocomplete="off" value="${esc(it.name)}" placeholder="약품/물품명"></td>
-        <td><input data-field="spec" value="${esc(it.spec)}"></td>
-        <td><input data-field="qty" type="number" min="0" value="${it.qty}" style="text-align:right;"></td>
-        <td><input data-field="price" type="number" min="0" value="${it.price}" style="text-align:right;"></td>
-        <td class="num">${won((Number(it.qty)||0)*(Number(it.price)||0))}</td>
-        <td style="text-align:center;"><button class="btn-icon danger" data-remove-item="${it.id}">✕</button></td>
-      </tr>
-    `).join("");
-
-   const isSupply = state.txType === "supply";
+  const isSupply = state.txType === "supply";
   const supplierPharm = isSupply ? mine : partner;
   const receiverPharm = isSupply ? partner : mine;
+
+  const itemRows = state.items.map((it,idx)=>`
+    <tr data-item="${it.id}">
+      <td>${idx+1}</td>
+      <td><input data-field="name" list="drug-datalist" autocomplete="off" value="${esc(it.name)}" placeholder="약품/물품명"></td>
+      <td><input data-field="spec" value="${esc(it.spec)}"></td>
+      <td><input data-field="qty" type="number" min="0" value="${it.qty}" style="text-align:right;"></td>
+      <td><input data-field="price" type="number" min="0" value="${it.price}" style="text-align:right;"></td>
+      <td class="num">${won((Number(it.qty)||0)*(Number(it.price)||0))}</td>
+      <td style="text-align:center;"><button class="btn-icon danger" data-remove-item="${it.id}">X</button></td>
+    </tr>
+  `).join("");
 
   return `
     <div style="margin-bottom:14px; background:#f1f5f9; padding:10px 14px; border-radius:6px; display:flex; gap:18px; align-items:center;">
@@ -455,9 +455,44 @@ if(!isConfigured){
           : `<select id="tx-partner"><option value="">선택하세요</option>${partnerOptions.map(p=>`<option value="${p.id}" ${p.id===state.selectedPartnerId?"selected":""}>${esc(p.name)}</option>`).join("")}</select>`}
       </div>
     </div>
+
+    ${state.txError ? `<p class="error-msg" style="color:red; margin-top:10px;">${esc(state.txError)}</p>` : ""}
+
+    <table class="items" style="margin-top:16px; width:100%; border-collapse:collapse;">
+      <thead>
+        <tr>
+          <th style="width:40px;">#</th>
+          <th>품목명</th>
+          <th style="width:100px;">규격</th>
+          <th style="width:70px;">수량</th>
+          <th style="width:90px;">단가</th>
+          <th style="width:100px;">금액</th>
+          <th style="width:50px;">삭제</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemRows}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5" style="text-align:right; font-weight:bold;">합계</td>
+          <td class="num" style="font-weight:bold;">${won(total)} 원</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <div style="margin-top:12px; display:flex; justify-content:space-between; align-items:center;">
+      <button class="btn secondary" id="add-item-row">+ 품목 추가</button>
+      <button class="btn secondary" id="export-excel">엑셀 저장</button>
+    </div>
+
+    <div style="margin-top:16px;" class="field">
+      <label>비고</label>
+      <input type="text" id="tx-note" value="${esc(state.txNote || "")}" placeholder="비고 입력">
+    </div>
   `;
 }
-
   function attachTabListeners(){
     const openLogin = document.getElementById("open-login");
     if(openLogin) openLogin.addEventListener("click", ()=>{ state.showLoginForm = true; render(); });
