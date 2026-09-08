@@ -205,6 +205,8 @@ if(!isConfigured){
     form: emptyForm(),
     formError: "",
     txDate: new Date().toISOString().slice(0,10),
+  txType: "supply",
+  selectedPartnerId: "",
     selectedPartnerId: "",
     items: [newItem()],
     txNote: "",
@@ -424,41 +426,37 @@ if(!isConfigured){
       </tr>
     `).join("");
 
-    return `
-      <div class="partner-info" style="margin-bottom:16px;">공급자(나): <strong>${esc(mine.name)}</strong>${mine.phone?` · ${esc(mine.phone)}`:""}</div>
-      <div class="grid2">
-        <div class="field"><label>거래일자</label><input type="date" id="tx-date" value="${state.txDate}"></div>
-        <div class="field">
-          <label>상대 약국 (공급받는자)</label>
-          ${partnerOptions.length === 0
-            ? `<p style="font-size:0.8rem; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:6px; padding:8px 10px; margin:0;">디렉토리에 다른 약국이 아직 없습니다.</p>`
-            : `<select id="tx-partner"><option value="">선택하세요</option>${partnerOptions.map(p=>`<option value="${p.id}" ${p.id===state.selectedPartnerId?"selected":""}>${esc(p.name)}</option>`).join("")}</select>`}
-        </div>
-      </div>
-      ${partner ? `<div class="partner-info">${partner.ceo?`대표자: ${esc(partner.ceo)} &nbsp; `:""}${partner.phone?`전화: ${esc(partner.phone)} &nbsp; `:""}${partner.address?`주소: ${esc(partner.address)}`:""}</div>` : ""}
+   const isSupply = state.txType === "supply";
+  const supplierPharm = isSupply ? mine : partner;
+  const receiverPharm = isSupply ? partner : mine;
 
-      <h3 style="font-size:0.9rem; margin:22px 0 8px;">거래 품목</h3>
-      <p style="font-size:0.78rem; color:${drugDataStatus==='ok' ? '#0f766e' : '#94a3b8'}; margin:0 0 8px;">
-        ${drugDataStatus==='ok'
-          ? `등록된 약가 데이터 ${drugPriceCount.toLocaleString('ko-KR')}개 품목과 일치하는 제품명을 입력하면 단가가 자동으로 채워집니다.`
-          : `약가 자동입력이 아직 연결되지 않았습니다.`}
-      </p>
-      <div class="table-scroll">
-        <table class="items">
-          <thead><tr><th style="width:28px;">#</th><th>품목명</th><th style="width:90px;">규격</th><th style="width:70px;">수량</th><th style="width:100px;">단가</th><th style="width:100px;">금액</th><th style="width:28px;"></th></tr></thead>
-          <tbody>${itemRows}</tbody>
-          <tfoot><tr><td colspan="5" style="text-align:right;">합계</td><td class="num" style="color:var(--accent);">${won(total)} 원</td><td></td></tr></tfoot>
-        </table>
+  return `
+    <div style="margin-bottom:14px; background:#f1f5f9; padding:10px 14px; border-radius:6px; display:flex; gap:18px; align-items:center;">
+      <span style="font-size:0.85rem; font-weight:700;">거래 유형:</span>
+      <label style="font-size:0.88rem; cursor:pointer;">
+        <input type="radio" name="tx-type" value="supply" ${isSupply ? "checked" : ""}> 우리 약국이 공급 (매출/보냄)
+      </label>
+      <label style="font-size:0.88rem; cursor:pointer;">
+        <input type="radio" name="tx-type" value="receive" ${!isSupply ? "checked" : ""}> 우리 약국이 공급받음 (매입/받음)
+      </label>
+    </div>
+
+    <div class="partner-info" style="margin-bottom:16px;">
+      공급자: <strong>${supplierPharm ? esc(supplierPharm.name) : "(선택 안 됨)"}</strong> 
+      | 공급받는자: <strong>${receiverPharm ? esc(receiverPharm.name) : "(선택 안 됨)"}</strong>
+    </div>
+
+    <div class="grid2">
+      <div class="field"><label>거래일자</label><input type="date" id="tx-date" value="${state.txDate}"></div>
+      <div class="field">
+        <label>상대 약국 (${isSupply ? "공급받는자" : "공급자"})</label>
+        ${partnerOptions.length === 0
+          ? `<p style="font-size:0.8rem; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:6px; padding:8px 10px; margin:0;">디렉토리에 다른 약국이 아직 없습니다.</p>`
+          : `<select id="tx-partner"><option value="">선택하세요</option>${partnerOptions.map(p=>`<option value="${p.id}" ${p.id===state.selectedPartnerId?"selected":""}>${esc(p.name)}</option>`).join("")}</select>`}
       </div>
-      <button class="btn-link" id="add-item" style="margin-top:8px;">+ 품목 추가</button>
-      <div class="field" style="margin-top:16px;"><label>비고 (선택)</label><input id="tx-note" value="${esc(state.txNote)}" placeholder="특이사항이 있으면 입력하세요"></div>
-      ${state.txError ? `<div class="error">${esc(state.txError)}</div>` : ""}
-      <div style="margin-top:18px;">
-        <button class="btn btn-primary" id="export-excel">⬇ 엑셀 거래명세서 다운로드</button>
-        <span class="flash" id="export-flash" style="display:none;">다운로드되었습니다.</span>
-      </div>
-    `;
-  }
+    </div>
+  `;
+}
 
   function attachTabListeners(){
     const openLogin = document.getElementById("open-login");
@@ -597,6 +595,12 @@ if(!isConfigured){
           if(totalCell) totalCell.textContent = won(total) + " 원";
         });
       });
+      document.querySelectorAll('input[name="tx-type"]').forEach(radio => {
+      radio.addEventListener("change", e => {
+        state.txType = e.target.value;
+        render();
+      });
+    });
       const exportBtn = document.getElementById("export-excel");
       if(exportBtn) exportBtn.addEventListener("click", exportExcel);
     }
@@ -662,6 +666,9 @@ if(!isConfigured){
     const partner = state.pharmacies.find(p => p.id === state.selectedPartnerId);
     if(!mine){ state.txError = "먼저 '내 약국 설정'에서 우리 약국을 선택해 주세요."; render(); return; }
     if(!partner){ state.txError = "거래할 상대 약국을 선택해 주세요."; render(); return; }
+const isSupply = state.txType === "supply";
+const supplier = isSupply ? mine : partner;
+const receiver = isSupply ? partner : mine;
     const validItems = state.items.filter(it => it.name && it.name.trim());
     if(validItems.length === 0){ state.txError = "품목을 최소 1개 이상 입력해 주세요."; render(); return; }
 
@@ -669,13 +676,13 @@ if(!isConfigured){
       ["거래명세서","","","","","",""],
       [],
       ["거래일자", state.txDate, "", "", "", "", ""],
-      ["공급자","상호", mine.name, "사업자등록번호", mine.biz||"", "", ""],
-      ["","대표자", mine.ceo||"", "전화번호", mine.phone||"", "", ""],
-      ["","주소", mine.address||"", "", "", "", ""],
+      ["공급자","상호", supplier.name, "사업자등록번호", supplier.biz||"", "", ""],
+      ["","대표자", supplier.ceo||"", "전화번호", supplier.phone||"", "", ""],
+      ["","주소",supplier.address||"", "", "", "", ""],
       [],
-      ["공급받는자","상호", partner.name, "사업자등록번호", partner.biz||"", "", ""],
-      ["","대표자", partner.ceo||"", "전화번호", partner.phone||"", "", ""],
-      ["","주소", partner.address||"", "", "", "", ""],
+      ["공급받는자","상호", receiver.name, "사업자등록번호", receiver.biz||"", "", ""],
+      ["","대표자", receiver.ceo||"", "전화번호", receiver.phone||"", "", ""],
+      ["","주소", receiver.address||"", "", "", "", ""],
       [],
      ["번호", "품목명", "규격", "수량", "단가", "공급가액", "비고"],
 ...validItems.map((it, idx) => [
