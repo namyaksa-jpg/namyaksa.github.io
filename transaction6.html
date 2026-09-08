@@ -219,7 +219,7 @@ if(!isConfigured){
     .catch(()=>{ drugDataStatus = "missing"; if(state.activeTab === "transaction") render(); });
 
   let state = {
-    activeTab: "directory",
+    activeTab: "mine",
     pharmacies: [],
     loading: true,
     connError: "",
@@ -251,6 +251,7 @@ if(!isConfigured){
     state.isAdmin = !!user;
     state.authChecked = true;
     state.showLoginForm = false;
+    if(!state.isAdmin && state.activeTab === "directory") state.activeTab = "mine";
     renderAuthBox();
     render();
   });
@@ -260,6 +261,7 @@ if(!isConfigured){
       state.pharmacies = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       state.loading = false;
       state.connError = "";
+      buildPharmacyDatalist();
       render();
     },
     err => {
@@ -288,7 +290,7 @@ if(!isConfigured){
     const app = document.getElementById("app");
     app.innerHTML = `
       <div class="tabs">
-        <button class="tab ${state.activeTab==='directory'?'active':''}" data-tab="directory">약국 디렉토리 (공용)</button>
+        ${state.isAdmin ? `<button class="tab ${state.activeTab==='directory'?'active':''}" data-tab="directory">약국 디렉토리 (공용)</button>` : ""}
         <button class="tab ${state.activeTab==='mine'?'active':''}" data-tab="mine">내 약국 설정</button>
         <button class="tab ${state.activeTab==='transaction'?'active':''}" data-tab="transaction">거래명세서 작성</button>
       </div>
@@ -353,10 +355,8 @@ if(!isConfigured){
 
     if(!state.isAdmin){
       return `
-        <p class="desc">여기 등록된 약국은 참여하는 모든 약사님 화면에 실시간으로 공유됩니다. 목록 열람은 누구나 가능하며, 등록·수정은 관리자만 할 수 있습니다.</p>
-        ${state.showLoginForm ? renderLoginForm() : `<p style="font-size:0.85rem;"><a id="open-login" class="btn-link">관리자로 로그인해서 약국 등록/수정하기</a></p>`}
-        <h3 style="font-size:0.9rem; margin-bottom:8px;">등록된 약국 (${state.pharmacies.length})</h3>
-        ${list}
+        <p class="desc">약국 목록 관리는 관리자만 할 수 있습니다.</p>
+        ${state.showLoginForm ? renderLoginForm() : `<p style="font-size:0.85rem;"><a id="open-login" class="btn-link">관리자로 로그인하기</a></p>`}
       `;
     }
 
@@ -429,11 +429,8 @@ if(!isConfigured){
       ${state.pharmacies.length === 0
         ? `<p class="empty-msg">먼저 '약국 디렉토리' 탭에서 우리 약국이 등록되어 있는지 확인해 주세요.</p>`
         : `<div class="field" style="max-width:360px;">
-             <label>내 약국 선택</label>
-             <select id="mine-select">
-               <option value="">선택하세요</option>
-               ${sortedPharmacies().map(p => `<option value="${p.id}" ${p.id===state.myPharmacyId?"selected":""}>${esc(p.name)}</option>`).join("")}
-             </select>
+             <label>내 약국 선택 (이름을 입력해서 찾으세요)</label>
+             <input type="text" id="mine-input" list="pharmacy-datalist" autocomplete="off" value="${mine ? esc(mine.name) : ''}" placeholder="약국명 입력">
            </div>`}
       ${mine ? `<div class="partner-info" style="margin-top:14px;">현재 선택됨: <strong>${esc(mine.name)}</strong>${mine.phone?` · ${esc(mine.phone)}`:""}</div>` : ""}
     `;
@@ -477,7 +474,7 @@ if(!isConfigured){
           <label>상대 약국 (${isSupply?"공급받는자":"공급자"})</label>
           ${partnerOptions.length === 0
             ? `<p style="font-size:0.8rem; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:6px; padding:8px 10px; margin:0;">디렉토리에 다른 약국이 아직 없습니다.</p>`
-            : `<select id="tx-partner"><option value="">선택하세요</option>${partnerOptions.map(p=>`<option value="${p.id}" ${p.id===state.selectedPartnerId?"selected":""}>${esc(p.name)}</option>`).join("")}</select>`}
+            : `<input type="text" id="tx-partner-input" list="pharmacy-datalist" autocomplete="off" value="${partner ? esc(partner.name) : ''}" placeholder="약국명 입력">`}
         </div>
       </div>
       ${partner ? `<div class="partner-info">${partner.ceo?`대표자: ${esc(partner.ceo)} &nbsp; `:""}${partner.phone?`전화: ${esc(partner.phone)} &nbsp; `:""}${partner.address?`주소: ${esc(partner.address)}`:""}</div>` : ""}
@@ -602,15 +599,29 @@ if(!isConfigured){
     }
 
     if(state.activeTab === "mine"){
-      const sel = document.getElementById("mine-select");
-      if(sel) sel.addEventListener("change", e=>{ state.myPharmacyId = e.target.value; localStorage.setItem("myPharmacyId", state.myPharmacyId); render(); });
+      const input = document.getElementById("mine-input");
+      if(input) input.addEventListener("change", e=>{
+        const match = state.pharmacies.find(p => (p.name||"").trim() === e.target.value.trim());
+        if(match){
+          state.myPharmacyId = match.id;
+          localStorage.setItem("myPharmacyId", state.myPharmacyId);
+        } else if(e.target.value.trim() === ""){
+          state.myPharmacyId = "";
+          localStorage.removeItem("myPharmacyId");
+        }
+        render();
+      });
     }
 
     if(state.activeTab === "transaction"){
       const dateEl = document.getElementById("tx-date");
       if(dateEl) dateEl.addEventListener("change", e=>{ state.txDate = e.target.value; });
-      const sel = document.getElementById("tx-partner");
-      if(sel) sel.addEventListener("change", e=>{ state.selectedPartnerId = e.target.value; render(); });
+      const partnerInput = document.getElementById("tx-partner-input");
+      if(partnerInput) partnerInput.addEventListener("change", e=>{
+        const match = state.pharmacies.find(p => p.id !== state.myPharmacyId && (p.name||"").trim() === e.target.value.trim());
+        state.selectedPartnerId = match ? match.id : (e.target.value.trim() === "" ? "" : state.selectedPartnerId);
+        render();
+      });
       const noteEl = document.getElementById("tx-note");
       if(noteEl) noteEl.addEventListener("input", e=>{ state.txNote = e.target.value; });
       const addBtn = document.getElementById("add-item");
