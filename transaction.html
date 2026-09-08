@@ -678,13 +678,13 @@ if(!isConfigured){
       ["","주소", partner.address||"", "", "", "", ""],
       [],
       ["번호","품목명","규격","수량","단가","공급가액","비고"],
-      ...validItems.map((it,idx)=>[idx+1, it.name, it.spec, Number(it.qty)||0, Number(it.price)||0, (Number(it.qty)||0)*(Number(it.price)||0), it.note||""]),
+     ...validItems.map((it, idx) => [idx + 1, it.name, it.spec, Number(it.qty)||0, Number(it.price)||0, (Number(it.qty)||0)*(Number(it.price)||0), it.note||""]),
       ["합계","","","","", validItems.reduce((s,it)=> s + (Number(it.qty)||0)*(Number(it.price)||0), 0), ""]
     ];
     if(state.txNote && state.txNote.trim()){ aoa.push([]); aoa.push(["비고", state.txNote, "", "", "", "", ""]); }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    const lastRow = 11 + validItems.length;
+   const lastRow = 11 + validItems.length;
     ws["!merges"] = [
       { s:{r:0,c:0}, e:{r:0,c:6} }, { s:{r:2,c:1}, e:{r:2,c:6} },
       { s:{r:3,c:0}, e:{r:5,c:0} }, { s:{r:5,c:2}, e:{r:5,c:6} },
