@@ -71,6 +71,15 @@
   .empty-msg{ text-align:center; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:8px; padding:24px; font-size:0.88rem; }
 
   table.items{ width:100%; min-width:560px; border-collapse:collapse; font-size:0.88rem; }
+  @media (max-width:480px){
+    table.items{ width:466px; min-width:466px; table-layout:fixed; }
+    table.items th:nth-child(1), table.items td:nth-child(1){ width:24px; }
+    table.items th:nth-child(2), table.items td:nth-child(2){ width:170px; min-width:170px; }
+    table.items th:nth-child(3), table.items td:nth-child(3){ width:64px; }
+    table.items th:nth-child(4), table.items td:nth-child(4){ width:90px; }
+    table.items th:nth-child(5), table.items td:nth-child(5){ width:90px; }
+    table.items th:nth-child(6), table.items td:nth-child(6){ width:24px; }
+  }
   table.items th{ background:#f1f5f9; color:var(--muted); font-size:0.75rem; text-align:left; padding:8px 6px; }
   table.items td{ padding:6px; border-top:1px solid var(--line); }
   table.items input{ width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:5px; font-size:0.85rem; font-family:inherit; }
