@@ -2,7 +2,7 @@
   "name": "공용 거래명세서 관리",
   "short_name": "거래명세서",
   "description": "약사 거래처 네트워크 - 공용 거래명세서 관리 도구",
-  "start_url": "./transaction.html",
+  "start_url": "./transaction6.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
