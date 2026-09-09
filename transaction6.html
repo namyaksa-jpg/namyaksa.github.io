@@ -70,13 +70,13 @@
   .p-meta{ display:flex; flex-wrap:wrap; gap:2px 14px; color:var(--muted); font-size:0.78rem; margin-top:3px; }
   .empty-msg{ text-align:center; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:8px; padding:24px; font-size:0.88rem; }
 
-  table.items{ width:100%; border-collapse:collapse; font-size:0.88rem; }
+  table.items{ width:100%; min-width:620px; border-collapse:collapse; font-size:0.88rem; }
   table.items th{ background:#f1f5f9; color:var(--muted); font-size:0.75rem; text-align:left; padding:8px 6px; }
   table.items td{ padding:6px; border-top:1px solid var(--line); }
   table.items input{ width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:5px; font-size:0.85rem; font-family:inherit; }
   table.items input:focus{ outline:none; border-color:var(--accent); }
   .num{ text-align:right; }
-  .table-scroll{ overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
+  .table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--line); border-radius:8px; }
   table.items tfoot td{ background:#f8fafc; font-weight:700; }
 
   table.preview{ width:100%; border-collapse:collapse; font-size:0.78rem; margin-top:10px; }
@@ -487,7 +487,7 @@ if(!isConfigured){
       </p>
       <div class="table-scroll">
         <table class="items">
-          <thead><tr><th style="width:28px;">#</th><th>품목명</th><th style="width:90px;">규격</th><th style="width:70px;">수량</th><th style="width:100px;">단가</th><th style="width:100px;">금액</th><th style="width:28px;"></th></tr></thead>
+          <thead><tr><th style="width:28px;">#</th><th style="min-width:200px;">품목명</th><th style="width:80px;">규격</th><th style="width:60px;">수량</th><th style="width:90px;">단가</th><th style="width:90px;">금액</th><th style="width:28px;"></th></tr></thead>
           <tbody>${itemRows}</tbody>
           <tfoot><tr><td colspan="5" style="text-align:right;">합계</td><td class="num" style="color:var(--accent);">${won(total)} 원</td><td></td></tr></tfoot>
         </table>
