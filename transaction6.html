@@ -70,7 +70,7 @@
   .p-meta{ display:flex; flex-wrap:wrap; gap:2px 14px; color:var(--muted); font-size:0.78rem; margin-top:3px; }
   .empty-msg{ text-align:center; color:#94a3b8; border:1px dashed #cbd5e1; border-radius:8px; padding:24px; font-size:0.88rem; }
 
-  table.items{ width:100%; min-width:620px; border-collapse:collapse; font-size:0.88rem; }
+  table.items{ width:100%; min-width:560px; border-collapse:collapse; font-size:0.88rem; }
   table.items th{ background:#f1f5f9; color:var(--muted); font-size:0.75rem; text-align:left; padding:8px 6px; }
   table.items td{ padding:6px; border-top:1px solid var(--line); }
   table.items input{ width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:5px; font-size:0.85rem; font-family:inherit; }
@@ -142,7 +142,7 @@ const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey.indexOf("YOU
 
 function esc(s){ return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
 function won(n){ return (Number(n)||0).toLocaleString("ko-KR"); }
-function newItem(){ return { id: Date.now()+Math.random(), name:"", spec:"", qty:1, price:0, note:"" }; }
+function newItem(){ return { id: Date.now()+Math.random(), name:"", qty:1, price:0, note:"" }; }
 function emptyForm(){ return { name:"", biz:"", ceo:"", phone:"", address:"" }; }
 function normalizeDrugName(s){ return (s||"").trim().replace(/\s+/g," "); }
 
@@ -451,7 +451,6 @@ if(!isConfigured){
       <tr data-item="${it.id}">
         <td>${idx+1}</td>
         <td><input data-field="name" list="drug-datalist" autocomplete="off" value="${esc(it.name)}" placeholder="약품/물품명"></td>
-        <td><input data-field="spec" value="${esc(it.spec)}"></td>
         <td><input data-field="qty" type="number" min="0" value="${it.qty}" style="text-align:right;"></td>
         <td><input data-field="price" type="number" min="0" value="${it.price}" style="text-align:right;"></td>
         <td class="num">${won((Number(it.qty)||0)*(Number(it.price)||0))}</td>
@@ -487,9 +486,9 @@ if(!isConfigured){
       </p>
       <div class="table-scroll">
         <table class="items">
-          <thead><tr><th style="width:28px;">#</th><th style="min-width:200px;">품목명</th><th style="width:80px;">규격</th><th style="width:60px;">수량</th><th style="width:90px;">단가</th><th style="width:90px;">금액</th><th style="width:28px;"></th></tr></thead>
+          <thead><tr><th style="width:28px;">#</th><th style="min-width:220px;">품목명</th><th style="width:70px;">수량</th><th style="width:100px;">단가</th><th style="width:100px;">금액</th><th style="width:28px;"></th></tr></thead>
           <tbody>${itemRows}</tbody>
-          <tfoot><tr><td colspan="5" style="text-align:right;">합계</td><td class="num" style="color:var(--accent);">${won(total)} 원</td><td></td></tr></tfoot>
+          <tfoot><tr><td colspan="4" style="text-align:right;">합계</td><td class="num" style="color:var(--accent);">${won(total)} 원</td><td></td></tr></tfoot>
         </table>
       </div>
       <button class="btn-link" id="add-item" style="margin-top:8px;">+ 품목 추가</button>
@@ -651,7 +650,7 @@ if(!isConfigured){
               if(priceInput) priceInput.value = matchedPrice;
             }
           }
-          const amountCell = row.children[5];
+          const amountCell = row.children[4];
           amountCell.textContent = won((Number(it.qty)||0)*(Number(it.price)||0));
           const total = state.items.reduce((s,x)=> s + (Number(x.qty)||0)*(Number(x.price)||0), 0);
           const totalCell = document.querySelector("table.items tfoot .num");
@@ -755,43 +754,43 @@ if(!isConfigured){
 
     const rows = [];
     const idx = {};
-    rows.push(["거래명세서","","","","","",""]);                                   idx.title = rows.length-1;
+    rows.push(["거래명세서","","","","",""]);                                   idx.title = rows.length-1;
     rows.push([]);
-    rows.push(["거래일자", state.txDate, "", "", "", "", ""]);                       idx.dateRow = rows.length-1;
-    rows.push(["공급자","상호", supplier.name, "사업자등록번호", supplier.biz||"", "", ""]);   idx.supplierStart = rows.length-1;
-    rows.push(["","대표자", supplier.ceo||"", "전화번호", supplier.phone||"", "", ""]);
-    rows.push(["","주소", supplier.address||"", "", "", "", ""]);                    idx.supplierAddress = rows.length-1;
+    rows.push(["거래일자", state.txDate, "", "", "", ""]);                       idx.dateRow = rows.length-1;
+    rows.push(["공급자","상호", supplier.name, "사업자등록번호", supplier.biz||"", ""]);   idx.supplierStart = rows.length-1;
+    rows.push(["","대표자", supplier.ceo||"", "전화번호", supplier.phone||"", ""]);
+    rows.push(["","주소", supplier.address||"", "", "", ""]);                    idx.supplierAddress = rows.length-1;
     rows.push([]);
-    rows.push(["공급받는자","상호", receiver.name, "사업자등록번호", receiver.biz||"", "", ""]); idx.receiverStart = rows.length-1;
-    rows.push(["","대표자", receiver.ceo||"", "전화번호", receiver.phone||"", "", ""]);
-    rows.push(["","주소", receiver.address||"", "", "", "", ""]);                    idx.receiverAddress = rows.length-1;
+    rows.push(["공급받는자","상호", receiver.name, "사업자등록번호", receiver.biz||"", ""]); idx.receiverStart = rows.length-1;
+    rows.push(["","대표자", receiver.ceo||"", "전화번호", receiver.phone||"", ""]);
+    rows.push(["","주소", receiver.address||"", "", "", ""]);                    idx.receiverAddress = rows.length-1;
     rows.push([]);
-    rows.push(["번호","품목명","규격","수량","단가","공급가액","비고"]);              idx.itemHeader = rows.length-1;
+    rows.push(["번호","품목명","수량","단가","공급가액","비고"]);              idx.itemHeader = rows.length-1;
     idx.itemStart = rows.length;
     validItems.forEach((it)=>{
-      rows.push([rows.length-idx.itemStart+1, it.name, it.spec, Number(it.qty)||0, Number(it.price)||0, (Number(it.qty)||0)*(Number(it.price)||0), it.note||""]);
+      rows.push([rows.length-idx.itemStart+1, it.name, Number(it.qty)||0, Number(it.price)||0, (Number(it.qty)||0)*(Number(it.price)||0), it.note||""]);
     });
     idx.itemEnd = rows.length-1;
-    rows.push(["합계","","","","", validItems.reduce((s,it)=> s + (Number(it.qty)||0)*(Number(it.price)||0), 0), ""]); idx.totalRow = rows.length-1;
+    rows.push(["합계","","","", validItems.reduce((s,it)=> s + (Number(it.qty)||0)*(Number(it.price)||0), 0), ""]); idx.totalRow = rows.length-1;
     if(state.txNote && state.txNote.trim()){
       rows.push([]);
-      rows.push(["비고", state.txNote, "", "", "", "", ""]); idx.noteRow = rows.length-1;
+      rows.push(["비고", state.txNote, "", "", "", ""]); idx.noteRow = rows.length-1;
     }
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws["!merges"] = [
-      { s:{r:idx.title,c:0}, e:{r:idx.title,c:6} },
-      { s:{r:idx.dateRow,c:1}, e:{r:idx.dateRow,c:6} },
+      { s:{r:idx.title,c:0}, e:{r:idx.title,c:5} },
+      { s:{r:idx.dateRow,c:1}, e:{r:idx.dateRow,c:5} },
       { s:{r:idx.supplierStart,c:0}, e:{r:idx.supplierAddress,c:0} },
-      { s:{r:idx.supplierAddress,c:2}, e:{r:idx.supplierAddress,c:6} },
+      { s:{r:idx.supplierAddress,c:2}, e:{r:idx.supplierAddress,c:5} },
       { s:{r:idx.receiverStart,c:0}, e:{r:idx.receiverAddress,c:0} },
-      { s:{r:idx.receiverAddress,c:2}, e:{r:idx.receiverAddress,c:6} },
-      { s:{r:idx.totalRow,c:0}, e:{r:idx.totalRow,c:4} }
+      { s:{r:idx.receiverAddress,c:2}, e:{r:idx.receiverAddress,c:5} },
+      { s:{r:idx.totalRow,c:0}, e:{r:idx.totalRow,c:3} }
     ];
     if(idx.noteRow !== undefined){
-      ws["!merges"].push({ s:{r:idx.noteRow,c:1}, e:{r:idx.noteRow,c:6} });
+      ws["!merges"].push({ s:{r:idx.noteRow,c:1}, e:{r:idx.noteRow,c:5} });
     }
-    ws["!cols"] = [{wch:10},{wch:20},{wch:12},{wch:8},{wch:10},{wch:14},{wch:16}];
+    ws["!cols"] = [{wch:10},{wch:24},{wch:8},{wch:10},{wch:14},{wch:16}];
 
     const THIN = { style:"thin", color:{ rgb:"000000" } };
     const BOX = { top:THIN, bottom:THIN, left:THIN, right:THIN };
@@ -801,10 +800,10 @@ if(!isConfigured){
       ws[ref].s = Object.assign({}, ws[ref].s, extra);
     }
     const borderedRows = rows.map((row,i)=> row.length > 0 && i !== idx.title ? i : -1).filter(i=>i>=0);
-    borderedRows.forEach(r=>{ for(let c=0;c<7;c++) styleCell(r, c, { border: BOX }); });
+    borderedRows.forEach(r=>{ for(let c=0;c<6;c++) styleCell(r, c, { border: BOX }); });
 
     styleCell(idx.title, 0, { font:{ bold:true, sz:14 }, alignment:{ horizontal:"center", vertical:"center" } });
-    for(let c=0;c<7;c++) styleCell(idx.itemHeader, c, { font:{ bold:true }, alignment:{ horizontal:"center", vertical:"center" } });
+    for(let c=0;c<6;c++) styleCell(idx.itemHeader, c, { font:{ bold:true }, alignment:{ horizontal:"center", vertical:"center" } });
     styleCell(idx.totalRow, 0, { font:{ bold:true } });
     styleCell(idx.dateRow, 0, { font:{ bold:true } });
     [idx.supplierStart, idx.supplierStart+1, idx.supplierAddress, idx.receiverStart, idx.receiverStart+1, idx.receiverAddress].forEach(r=>{
