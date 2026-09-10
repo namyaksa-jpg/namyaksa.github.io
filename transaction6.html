@@ -828,7 +828,7 @@ if(!isConfigured){
 
     const workbook = new ExcelJS.Workbook();
     const ws = workbook.addWorksheet("거래명세서");
-    ws.columns = [{width:10},{width:24},{width:8},{width:10},{width:14},{width:16}];
+    ws.columns = [{width:10},{width:30},{width:8},{width:13},{width:14},{width:9}];
 
     rows.forEach((rowArr, r) => {
       rowArr.forEach((val, c) => {
@@ -840,8 +840,10 @@ if(!isConfigured){
     mergeRange(idx.title,0, idx.title,5);
     mergeRange(idx.dateRow,1, idx.dateRow,5);
     mergeRange(idx.supplierStart,0, idx.supplierAddress,0);
+    ws.getCell(idx.supplierStart+1, 1).alignment = { vertical:"middle", horizontal:"left" };
     mergeRange(idx.supplierAddress,2, idx.supplierAddress,5);
     mergeRange(idx.receiverStart,0, idx.receiverAddress,0);
+    ws.getCell(idx.receiverStart+1, 1).alignment = { vertical:"middle", horizontal:"left" };
     mergeRange(idx.receiverAddress,2, idx.receiverAddress,5);
     mergeRange(idx.totalRow,0, idx.totalRow,3);
     if(idx.noteRow !== undefined) mergeRange(idx.noteRow,1, idx.noteRow,5);
@@ -874,10 +876,10 @@ if(!isConfigured){
         if(match){
           const ext = match[1] === "jpeg" ? "jpeg" : "png";
           const imageId = workbook.addImage({ base64: state.myStamp, extension: ext });
-          const stampRow = (mine.id === supplier.id) ? idx.supplierStart+1 : idx.receiverStart+1;
+          const stampBlockStart = (mine.id === supplier.id) ? idx.supplierStart : idx.receiverStart;
           ws.addImage(imageId, {
-            tl: { col: 2.55, row: stampRow - 0.15 },
-            ext: { width: 62, height: 62 }
+            tl: { col: 5.15, row: stampBlockStart + 0.15 },
+            ext: { width: 60, height: 60 }
           });
         }
       }catch(e){ console.warn("도장 삽입 실패", e); }
