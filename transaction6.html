@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
@@ -240,6 +241,7 @@ if(!isConfigured){
     loading: true,
     connError: "",
     myPharmacyId: localStorage.getItem("myPharmacyId") || "",
+    myStamp: localStorage.getItem("myStampImage") || "",
     editingId: null,
     form: emptyForm(),
     formError: "",
@@ -449,6 +451,18 @@ if(!isConfigured){
              <input type="text" id="mine-input" list="pharmacy-datalist" autocomplete="off" value="${mine ? esc(mine.name) : ''}" placeholder="약국명 입력">
            </div>`}
       ${mine ? `<div class="partner-info" style="margin-top:14px;">현재 선택됨: <strong>${esc(mine.name)}</strong>${mine.phone?` · ${esc(mine.phone)}`:""}</div>` : ""}
+
+      <div class="box" style="margin-top:20px;">
+        <h3>도장 이미지 (선택)</h3>
+        <p style="font-size:0.82rem; color:var(--muted); margin-top:0;">등록해두면, 엑셀 거래명세서를 다운로드할 때 우리 약국 대표자 이름 옆에 자동으로 찍혀서 나옵니다. 배경이 투명한 PNG 파일을 권장합니다. 이 이미지도 이 브라우저에만 저장됩니다.</p>
+        <input type="file" id="stamp-file" accept="image/png,image/jpeg">
+        ${state.myStamp ? `
+          <div style="margin-top:12px; display:flex; align-items:center; gap:14px;">
+            <img src="${state.myStamp}" alt="도장 미리보기" style="width:70px; height:70px; object-fit:contain; border:1px solid var(--line); border-radius:6px; background:#fff;">
+            <button class="btn btn-ghost" id="stamp-remove">도장 삭제</button>
+          </div>
+        ` : ""}
+      </div>
     `;
   }
 
@@ -477,7 +491,7 @@ if(!isConfigured){
     return `
       <div class="type-box">
         <span style="font-size:0.85rem; font-weight:700;">거래 유형:</span>
-        <label><input type="radio" name="tx-type" value="supply" ${isSupply?"checked":""}> 우리 약국이 공급함 (매출/보냄)</label>
+        <label><input type="radio" name="tx-type" value="supply" ${isSupply?"checked":""}> 우리 약국이 공급 (매출/보냄)</label>
         <label><input type="radio" name="tx-type" value="receive" ${!isSupply?"checked":""}> 우리 약국이 공급받음 (매입/받음)</label>
       </div>
       <div class="partner-info" style="margin-bottom:16px;">
@@ -626,6 +640,25 @@ if(!isConfigured){
         }
         render();
       });
+
+      const stampFile = document.getElementById("stamp-file");
+      if(stampFile) stampFile.addEventListener("change", (e)=>{
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev)=>{
+          state.myStamp = ev.target.result;
+          localStorage.setItem("myStampImage", state.myStamp);
+          render();
+        };
+        reader.readAsDataURL(file);
+      });
+      const stampRemove = document.getElementById("stamp-remove");
+      if(stampRemove) stampRemove.addEventListener("click", ()=>{
+        state.myStamp = "";
+        localStorage.removeItem("myStampImage");
+        render();
+      });
     }
 
     if(state.activeTab === "transaction"){
@@ -756,7 +789,7 @@ if(!isConfigured){
     render();
   }
 
-  function exportExcel(){
+  async function exportExcel(){
     state.txError = "";
     const mine = state.pharmacies.find(p => p.id === state.myPharmacyId);
     const partner = state.pharmacies.find(p => p.id === state.selectedPartnerId);
@@ -793,45 +826,65 @@ if(!isConfigured){
       rows.push(["비고", state.txNote, "", "", "", ""]); idx.noteRow = rows.length-1;
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!merges"] = [
-      { s:{r:idx.title,c:0}, e:{r:idx.title,c:5} },
-      { s:{r:idx.dateRow,c:1}, e:{r:idx.dateRow,c:5} },
-      { s:{r:idx.supplierStart,c:0}, e:{r:idx.supplierAddress,c:0} },
-      { s:{r:idx.supplierAddress,c:2}, e:{r:idx.supplierAddress,c:5} },
-      { s:{r:idx.receiverStart,c:0}, e:{r:idx.receiverAddress,c:0} },
-      { s:{r:idx.receiverAddress,c:2}, e:{r:idx.receiverAddress,c:5} },
-      { s:{r:idx.totalRow,c:0}, e:{r:idx.totalRow,c:3} }
-    ];
-    if(idx.noteRow !== undefined){
-      ws["!merges"].push({ s:{r:idx.noteRow,c:1}, e:{r:idx.noteRow,c:5} });
-    }
-    ws["!cols"] = [{wch:10},{wch:24},{wch:8},{wch:10},{wch:14},{wch:16}];
+    const workbook = new ExcelJS.Workbook();
+    const ws = workbook.addWorksheet("거래명세서");
+    ws.columns = [{width:10},{width:24},{width:8},{width:10},{width:14},{width:16}];
 
-    const THIN = { style:"thin", color:{ rgb:"000000" } };
-    const BOX = { top:THIN, bottom:THIN, left:THIN, right:THIN };
-    function styleCell(r, c, extra){
-      const ref = XLSX.utils.encode_cell({ r, c });
-      if(!ws[ref]) ws[ref] = { t:"s", v:"" };
-      ws[ref].s = Object.assign({}, ws[ref].s, extra);
-    }
-    const borderedRows = rows.map((row,i)=> row.length > 0 && i !== idx.title ? i : -1).filter(i=>i>=0);
-    borderedRows.forEach(r=>{ for(let c=0;c<6;c++) styleCell(r, c, { border: BOX }); });
-
-    styleCell(idx.title, 0, { font:{ bold:true, sz:14 }, alignment:{ horizontal:"center", vertical:"center" } });
-    for(let c=0;c<6;c++) styleCell(idx.itemHeader, c, { font:{ bold:true }, alignment:{ horizontal:"center", vertical:"center" } });
-    styleCell(idx.totalRow, 0, { font:{ bold:true } });
-    styleCell(idx.dateRow, 0, { font:{ bold:true } });
-    [idx.supplierStart, idx.supplierStart+1, idx.supplierAddress, idx.receiverStart, idx.receiverStart+1, idx.receiverAddress].forEach(r=>{
-      styleCell(r, 0, { font:{ bold:true } });
-      styleCell(r, 1, { font:{ bold:true } });
-      styleCell(r, 3, { font:{ bold:true } });
+    rows.forEach((rowArr, r) => {
+      rowArr.forEach((val, c) => {
+        ws.getCell(r+1, c+1).value = val;
+      });
     });
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "거래명세서");
-    const wbout = XLSX.write(wb, { bookType:"xlsx", type:"array" });
-    const blob = new Blob([wbout], { type:"application/octet-stream" });
+    const mergeRange = (r1,c1,r2,c2) => ws.mergeCells(r1+1, c1+1, r2+1, c2+1);
+    mergeRange(idx.title,0, idx.title,5);
+    mergeRange(idx.dateRow,1, idx.dateRow,5);
+    mergeRange(idx.supplierStart,0, idx.supplierAddress,0);
+    mergeRange(idx.supplierAddress,2, idx.supplierAddress,5);
+    mergeRange(idx.receiverStart,0, idx.receiverAddress,0);
+    mergeRange(idx.receiverAddress,2, idx.receiverAddress,5);
+    mergeRange(idx.totalRow,0, idx.totalRow,3);
+    if(idx.noteRow !== undefined) mergeRange(idx.noteRow,1, idx.noteRow,5);
+
+    const THIN = { style:"thin", color:{ argb:"FF000000" } };
+    const BOX = { top:THIN, bottom:THIN, left:THIN, right:THIN };
+    const borderedRows = rows.map((row,i)=> row.length > 0 && i !== idx.title ? i : -1).filter(i=>i>=0);
+    borderedRows.forEach(r=>{
+      for(let c=0;c<6;c++) ws.getCell(r+1, c+1).border = BOX;
+    });
+
+    ws.getCell(idx.title+1, 1).font = { bold:true, size:14 };
+    ws.getCell(idx.title+1, 1).alignment = { horizontal:"center", vertical:"middle" };
+    for(let c=0;c<6;c++){
+      ws.getCell(idx.itemHeader+1, c+1).font = { bold:true };
+      ws.getCell(idx.itemHeader+1, c+1).alignment = { horizontal:"center", vertical:"middle" };
+    }
+    ws.getCell(idx.totalRow+1, 1).font = { bold:true };
+    ws.getCell(idx.dateRow+1, 1).font = { bold:true };
+    [idx.supplierStart, idx.supplierStart+1, idx.supplierAddress, idx.receiverStart, idx.receiverStart+1, idx.receiverAddress].forEach(r=>{
+      ws.getCell(r+1, 1).font = { bold:true };
+      ws.getCell(r+1, 2).font = { bold:true };
+      ws.getCell(r+1, 4).font = { bold:true };
+    });
+
+    // 도장 이미지 자동 삽입: 내 약국이 이 거래의 어느 쪽(공급자/공급받는자)인지 찾아서 대표자 칸 옆에 배치
+    if(state.myStamp){
+      try{
+        const match = state.myStamp.match(/^data:image\/(png|jpeg);base64,(.*)$/);
+        if(match){
+          const ext = match[1] === "jpeg" ? "jpeg" : "png";
+          const imageId = workbook.addImage({ base64: state.myStamp, extension: ext });
+          const stampRow = (mine.id === supplier.id) ? idx.supplierStart+1 : idx.receiverStart+1;
+          ws.addImage(imageId, {
+            tl: { col: 2.55, row: stampRow - 0.15 },
+            ext: { width: 62, height: 62 }
+          });
+        }
+      }catch(e){ console.warn("도장 삽입 실패", e); }
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type:"application/octet-stream" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
